@@ -1,233 +1,138 @@
-# CSC Latin America 2026 - HEP Computing
-# CMake template for exercises
 cmake_minimum_required(VERSION 3.16)
-project(CSC2026_Exercises VERSION 1.0.0 LANGUAGES CXX)
-
-# C++20 standard (use 23 if available for latest features)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Ensure include directory exists
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-# Export compile_commands.json for IDE support
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Build type (default to Release with Debug info)
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
-endif()
-
-# Compiler warnings
-add_compile_options(
-    -Wall
-    -Wextra
-    -Wpedantic
-    -Wshadow
-    -Wnon-virtual-dtor
-    -Wold-style-cast
-    -Wcast-align
-    -Woverloaded-virtual
-)
+project(csc2026 LANGUAGES CXX)
 
 # ============================================================================
 # Options
 # ============================================================================
-option(ENABLE_SANITIZERS "Enable ASan and UBSan" OFF)
-option(ENABLE_TSAN "Enable ThreadSanitizer (mutually exclusive with ASan)" OFF)
-option(ENABLE_OPENMP "Enable OpenMP support" ON)
+option(ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+option(ENABLE_OPENMP "Enable OpenMP parallelism" ON)
+
 option(BUILD_TESTS "Build unit tests" ON)
-option(BUILD_BENCHMARKS "Build benchmarks" ON)
+option(BUILD_BENCHMARKS "Build microbenchmarks" ON)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# ============================================================================
+# Compiler warnings
+# ============================================================================
+if(MSVC)
+  add_compile_options(/W4 /permissive-)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
+endif()
 
 # ============================================================================
 # Sanitizers
 # ============================================================================
 if(ENABLE_SANITIZERS AND ENABLE_TSAN)
-    message(FATAL_ERROR "Cannot enable both ASan and TSan simultaneously")
+  message(FATAL_ERROR "ENABLE_SANITIZERS and ENABLE_TSAN are mutually exclusive.")
 endif()
 
 if(ENABLE_SANITIZERS)
-    message(STATUS "Enabling AddressSanitizer and UndefinedBehaviorSanitizer")
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=address,undefined)
+  message(STATUS "Sanitizers: Address + Undefined")
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=address,undefined)
 endif()
 
 if(ENABLE_TSAN)
-    message(STATUS "Enabling ThreadSanitizer")
-    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
-    add_link_options(-fsanitize=thread)
+  message(STATUS "Sanitizers: Thread")
+  add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=thread)
 endif()
 
 # ============================================================================
-# Find Dependencies
-# ============================================================================
-
-# ROOT
-find_package(ROOT REQUIRED COMPONENTS Core RIO Tree Hist MathCore Physics)
-include(${ROOT_USE_FILE})
-message(STATUS "Found ROOT: ${ROOT_VERSION} at ${ROOT_DIR}")
-
 # OpenMP
+# ============================================================================
 if(ENABLE_OPENMP)
-    find_package(OpenMP)
-    if(OpenMP_CXX_FOUND)
-        message(STATUS "Found OpenMP: ${OpenMP_CXX_VERSION}")
-    else()
-        message(WARNING "OpenMP not found, parallel features disabled")
-    endif()
-endif()
-
-# TBB
-find_package(TBB QUIET)
-if(TBB_FOUND)
-    message(STATUS "Found TBB: ${TBB_VERSION}")
+  find_package(OpenMP)
+  if(OpenMP_CXX_FOUND)
+    message(STATUS "OpenMP: enabled")
+    add_compile_definitions(CSC2026_USE_OPENMP=1)
+  else()
+    message(WARNING "OpenMP requested but not found. Building without OpenMP.")
+  endif()
 else()
-    message(STATUS "TBB not found, some parallel features may be unavailable")
+  message(STATUS "OpenMP: disabled")
 endif()
 
-# Catch2 (for testing)
+# ============================================================================
+# Dependencies: Catch2 (tests) and Google Benchmark (benchmarks)
+# ============================================================================
+include(FetchContent)
+
 if(BUILD_TESTS)
-    find_package(Catch2 3 QUIET)
-    if(Catch2_FOUND)
-        message(STATUS "Found Catch2: ${Catch2_VERSION}")
-    else()
-        message(STATUS "Catch2 not found, fetching from GitHub...")
-        include(FetchContent)
-        FetchContent_Declare(
-            Catch2
-            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-            GIT_TAG v3.5.2
-        )
-        FetchContent_MakeAvailable(Catch2)
-    endif()
+  FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.5.3
+  )
+  FetchContent_MakeAvailable(Catch2)
+  include(CTest)
 endif()
 
-# Google Benchmark
 if(BUILD_BENCHMARKS)
-    find_package(benchmark QUIET)
-    if(benchmark_FOUND)
-        message(STATUS "Found Google Benchmark")
-    else()
-        message(STATUS "Google Benchmark not found, fetching from GitHub...")
-        include(FetchContent)
-        FetchContent_Declare(
-            benchmark
-            GIT_REPOSITORY https://github.com/google/benchmark.git
-            GIT_TAG v1.8.3
-        )
-        set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(benchmark)
-    endif()
+  FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG v1.8.3
+  )
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(benchmark)
 endif()
 
 # ============================================================================
-# Library: Core analysis library
+# Library: csc2026
 # ============================================================================
-add_library(analysis SHARED
-    src/Particle.cpp
-    src/EventProcessor.cpp
-    src/TrackReconstructor.cpp
+add_library(csc2026
+  src/TrackReconstructor.cpp
+  src/EventProcessor.cpp
+  src/Particle.cpp
 )
 
-target_include_directories(analysis PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${ROOT_INCLUDE_DIRS}
-)
+target_include_directories(csc2026 PUBLIC include)
 
-target_link_libraries(analysis PUBLIC
-    ROOT::Core
-    ROOT::RIO
-    ROOT::Tree
-    ROOT::Hist
-    ROOT::MathCore
-    ROOT::Physics
-)
-
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(analysis PUBLIC OpenMP::OpenMP_CXX)
-endif()
-
-if(TBB_FOUND)
-    target_link_libraries(analysis PUBLIC TBB::tbb)
+if(ENABLE_OPENMP AND OpenMP_CXX_FOUND)
+  target_link_libraries(csc2026 PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
 # ============================================================================
-# Executables
+# Main executables
 # ============================================================================
-
-# Main analysis executable
 add_executable(analyze src/main.cpp)
-target_link_libraries(analyze PRIVATE analysis)
+target_link_libraries(analyze PRIVATE csc2026)
 
-# Event processor example
 add_executable(event_processor src/event_processor_main.cpp)
-target_link_libraries(event_processor PRIVATE analysis)
+target_link_libraries(event_processor PRIVATE csc2026)
 
 # ============================================================================
 # Tests
 # ============================================================================
 if(BUILD_TESTS)
-    enable_testing()
-    
-    add_executable(tests
-        tests/test_particle.cpp
-        tests/test_event_processor.cpp
-        tests/test_track_reconstructor.cpp
-    )
-    
-    target_link_libraries(tests PRIVATE
-        analysis
-        Catch2::Catch2WithMain
-    )
-    
-    # Register tests with CTest
-    include(Catch)
-    catch_discover_tests(tests)
+  add_executable(test_track_reconstructor tests/test_track_reconstructor.cpp)
+  target_link_libraries(test_track_reconstructor PRIVATE csc2026 Catch2::Catch2WithMain)
+  add_test(NAME track_reconstructor COMMAND test_track_reconstructor)
+
+  add_executable(test_event_processor tests/test_event_processor.cpp)
+  target_link_libraries(test_event_processor PRIVATE csc2026 Catch2::Catch2WithMain)
+  add_test(NAME event_processor COMMAND test_event_processor)
+
+  add_executable(test_particle tests/test_particle.cpp)
+  target_link_libraries(test_particle PRIVATE csc2026 Catch2::Catch2WithMain)
+  add_test(NAME particle COMMAND test_particle)
 endif()
 
 # ============================================================================
 # Benchmarks
 # ============================================================================
 if(BUILD_BENCHMARKS)
-    add_executable(benchmarks
-        benchmarks/bench_particle.cpp
-        benchmarks/bench_event_processor.cpp
-    )
-    
-    target_link_libraries(benchmarks PRIVATE
-        analysis
-        benchmark::benchmark
-        benchmark::benchmark_main
-    )
+  add_executable(benchmarks
+    benchmarks/bench_event_processor.cpp
+    benchmarks/bench_particle.cpp
+  )
+  target_link_libraries(benchmarks PRIVATE csc2026 benchmark::benchmark)
 endif()
 
-# ============================================================================
-# Installation
-# ============================================================================
-install(TARGETS analysis analyze
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
-
-install(DIRECTORY include/
-    DESTINATION include
-)
-
-# ============================================================================
-# Print Configuration Summary
-# ============================================================================
-message(STATUS "")
-message(STATUS "=== CSC 2026 Build Configuration ===")
-message(STATUS "Build type:        ${CMAKE_BUILD_TYPE}")
-message(STATUS "C++ Standard:      ${CMAKE_CXX_STANDARD}")
-message(STATUS "Compiler:          ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "ROOT version:      ${ROOT_VERSION}")
-message(STATUS "OpenMP:            ${OpenMP_CXX_FOUND}")
-message(STATUS "TBB:               ${TBB_FOUND}")
-message(STATUS "Sanitizers:        ${ENABLE_SANITIZERS}")
-message(STATUS "ThreadSanitizer:   ${ENABLE_TSAN}")
-message(STATUS "Build tests:       ${BUILD_TESTS}")
-message(STATUS "Build benchmarks:  ${BUILD_BENCHMARKS}")
-message(STATUS "=====================================")
-message(STATUS "")
