@@ -10,6 +10,11 @@ on:
 env:
   BUILD_TYPE: Release
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
 jobs:
   # ==========================================================================
   # Build and Test (Standard)
@@ -233,3 +238,4 @@ jobs:
         name: documentation
         path: site/
         retention-days: 7
+
