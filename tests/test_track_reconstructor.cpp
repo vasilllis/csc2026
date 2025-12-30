@@ -29,5 +29,5 @@ TEST_CASE("TrackReconstructor best track is accessible") {
 
     const csc2026::Track* best = reco.getBestTrack();
     REQUIRE(best != nullptr);
-    REQUIRE(best->pt == Approx(2.0));
+    REQUIRE(best->pt == Catch::Approx(2.0));
 }
