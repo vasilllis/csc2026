@@ -24,16 +24,15 @@ void EventProcessor::processEvent(const Event& event) {
 }
 
 void EventProcessor::processEvents(const std::vector<Event>& events) {
-    // Intentionally incorrect: race conditions + false sharing
+    // Fixed: added reduction clause and fixed loop variable type
     int tracks = 0;
     double energy = 0.0;
 
 #ifdef CSC2026_USE_OPENMP
-#pragma omp parallel for
+#pragma omp parallel for reduction(+:tracks, energy)
 #endif
-    for (size_t i = 0; i < events.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(events.size()); ++i) {
         for (const auto& particle : events[i].particles) {
-            // Race condition: shared variables updated by multiple threads
             tracks++;
             energy += particle.energy();
         }
@@ -57,7 +56,7 @@ std::vector<Event> EventProcessor::generateSampleEvents(size_t nEvents) {
         e.id = static_cast<int>(i);
 
         // Create a fixed number of particles per event
-        e.particles.resize(100);
+        e.particles.resize(10000);
         for (size_t p = 0; p < e.particles.size(); ++p) {
             Particle part;
             part.px = 0.1 * static_cast<double>(p);

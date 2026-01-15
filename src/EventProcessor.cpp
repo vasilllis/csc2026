@@ -26,9 +26,9 @@ void EventProcessor::processEvents(const std::vector<Event>& events) {
 #ifdef CSC2026_USE_OPENMP
 #pragma omp parallel for reduction(+:tracks, energy)
 #endif
-    for (size_t i = 0; i < events.size(); ++i) {
+    for (int i = 0; i < events.size(); ++i) {
         for (const auto& particle : events[i].particles) {
-            tracks++;
+            tracks+=1;
             energy += particle.energy();
         }
     }
